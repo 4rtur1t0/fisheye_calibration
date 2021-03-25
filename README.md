@@ -1,6 +1,10 @@
 # fisheye_calibration
 An OpenCV-based calibration program for fisheye cameras.
 
+Tested with:
+- Ubuntu 20.04 LTS.
+- OpenCV 3.4.1. Please refer to opencv.org for installation instructions.
+
 Features:
 - The code is extended from the OpenCV file camera_calibration.cpp.
 - Some cute extensions are added, such as reprojection of points to the image and undistorting all images.
@@ -24,6 +28,13 @@ Instructions:
 - All configuration parameters for the calibration are stored at calib_config.xml
 - The result of the calibration is written to out_camera_data.yml
 - To calibrate for fisheye/pinhole camera, change the setting at calib_config.xml
+
+# SHOW EXTRINSICS
+For convenience the camera_calibration_show_extrinsics.py python file from OpenCV is provided
+Just call:
+$ python camera_calibration_show_extrinsics.py calib_data_example.yml
+
+And observe the results. The rvecs and tvecs in calib_data_example.yml will be plotted.
 
 # NOTES
 Fisheye cameras are difficult to calibrate. Some caution must be observed when changing the parameters in the calib config file. In particular:
