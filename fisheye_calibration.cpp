@@ -1,3 +1,15 @@
+/*
+    A version of the camera_calibration.cpp file provided by OpenCV.
+
+    Added some features such as reprojection of the points on the calibration 
+    images and showing some extra info.
+
+    Examples are provided (that work!) with fisheye real images.
+
+    author: Arturo Gil Aparicio
+    email: arturo.gil@umh.es
+    date: march 2021
+*/
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -17,10 +29,9 @@ using namespace std;
 
 static void help()
 {
-    cout <<  "This is a camera calibration sample." << endl
-         <<  "Usage: camera_calibration [configuration_file -- default ./default.xml]"  << endl
-         <<  "Near the sample file you'll find the configuration file, which has detailed help of "
-             "how to edit it.  It may be any OpenCV supported file format XML/YAML." << endl;
+    cout <<  "This is fisheye_calibration." << endl
+         <<  "Usage: fisheye_calibration [configuration_file -- default ./default.xml]"  << endl
+         <<  "Example: ./fisheye_calibration calib_config/calib_config_example.xml" << endl;
 }
 class Settings
 {
@@ -277,12 +288,15 @@ int main(int argc, char* argv[])
     }
 
     vector<vector<Point2f> > imagePoints;
-    Mat cameraMatrix, distCoeffs;
+    Mat cameraMatrix, distCoeffs, newK;
     Size imageSize;
     int mode = s.inputType == Settings::IMAGE_LIST ? CAPTURING : DETECTION;
     clock_t prevTimestamp = 0;
     const Scalar RED(0,0,255), GREEN(0,255,0);
     const char ESC_KEY = 27;
+
+    namedWindow("Image View", CV_WINDOW_NORMAL);
+    resizeWindow("Image View", 1400, 1400);
 
     //! [get_input]
     for(;;)
@@ -348,7 +362,7 @@ int main(int argc, char* argv[])
                 {
                     Mat viewGray;
                     cvtColor(view, viewGray, COLOR_BGR2GRAY);
-                    cornerSubPix( viewGray, pointBuf, Size(11,11),
+                    cornerSubPix( viewGray, pointBuf, Size(20,20),
                         Size(-1,-1), TermCriteria( TermCriteria::EPS+TermCriteria::COUNT, 30, 0.1 ));
                 }
 
@@ -397,6 +411,7 @@ int main(int argc, char* argv[])
         }
         //! [output_undistorted]
         //------------------------------ Show image and check for input commands -------------------
+        
         //! [await_input]
         imshow("Image View", view);
         char key = (char)waitKey(s.inputCapture.isOpened() ? 50 : s.delay);
@@ -420,7 +435,9 @@ int main(int argc, char* argv[])
     if( s.inputType == Settings::IMAGE_LIST && s.showUndistorsed && !cameraMatrix.empty())
     {
         Mat view, rview, map1, map2;
-
+        destroyAllWindows();
+        namedWindow("Undistorted Image View", CV_WINDOW_NORMAL);
+        resizeWindow("Undistorted Image View", 1400, 1400);
         if (s.useFisheye)
         {
             Mat newCamMat;
@@ -439,11 +456,13 @@ int main(int argc, char* argv[])
 
         for(size_t i = 0; i < s.imageList.size(); i++ )
         {
+            
             view = imread(s.imageList[i], IMREAD_COLOR);
             if(view.empty())
                 continue;
             remap(view, rview, map1, map2, INTER_LINEAR);
-            imshow("Image View", rview);
+            //cv::fisheye::undistortImage(view, rview, cameraMatrix, distCoeffs, newK);
+            imshow("Undistorted Image View", rview);
             char c = (char)waitKey();
             if( c  == ESC_KEY || c == 'q' || c == 'Q' )
                 break;
@@ -508,10 +527,16 @@ static double reprojectOnImages(Settings& s, const vector<vector<Point3f> >& obj
     cout << "Green circles: ground-truth" << endl;
     cout << "Red crosses: model" << endl;
 
+    cv::destroyAllWindows();
+    
+    namedWindow("Image View with projected points green: ground-truth, red: model", CV_WINDOW_NORMAL);
+    resizeWindow("Image View with projected points green: ground-truth, red: model", 1400, 1400);
+    cout << "Showing images with reprojected points. Press any key to continue." << endl;
+    cout << "Press ESC to exit" << endl ;
     for(size_t i = 0; i < objectPoints.size(); ++i )
     {
 	 Mat view;
-	 cout << "Showing image" << s.imageList[i] << endl;
+	 cout << "Showing image: " << s.imageList[i];
         if (fisheye)
         {
             fisheye::projectPoints(objectPoints[i], imagePoints2, rvecs[i], tvecs[i], cameraMatrix,
@@ -521,7 +546,11 @@ static double reprojectOnImages(Settings& s, const vector<vector<Point3f> >& obj
         {
             projectPoints(objectPoints[i], rvecs[i], tvecs[i], cameraMatrix, distCoeffs, imagePoints2);
         }
-        
+        err = norm(imagePoints[i], imagePoints2, NORM_L2);
+        size_t n = imagePoints[i].size();
+
+        cout << ". RMS error for this view is: " << (float) std::sqrt(err*err/n) << endl;
+
         //Load calib image
         view = imread(s.imageList[i], IMREAD_COLOR);
         if(view.empty())
@@ -539,6 +568,7 @@ static double reprojectOnImages(Settings& s, const vector<vector<Point3f> >& obj
           }
                 
         imshow("Image View with projected points green: ground-truth, red: model", view);
+        
         char c = (char)waitKey();
         if( c  == ESC_KEY || c == 'q' || c == 'Q' )
              break;
@@ -619,12 +649,15 @@ static bool runCalibration( Settings& s, Size& imageSize, Mat& cameraMatrix, Mat
     cout << "Re-projection error reported by calibrateCamera: "<< rms << endl;
 
     bool ok = checkRange(cameraMatrix) && checkRange(distCoeffs);
+    cout << "***********************"<< endl;
+    cout << endl << "CALIBRATION FINISHED!. check output XML/YAML file" << endl;
+    cout << "***********************"<< endl;
 
-    cout << "CALIBRATION FINISHED. CHECK OUPUT XML FILE" << endl;
     cout << "Computing reprojection error" << endl;
     totalAvgErr = computeReprojectionErrors(objectPoints, imagePoints, rvecs, tvecs, cameraMatrix,
                                             distCoeffs, reprojErrs, s.useFisheye);
     cout << "Reprojecting on images!" << endl;
+    cout << "Press space to continue. Press ESC to exit." << endl;
     reprojectOnImages(s, objectPoints, imagePoints, rvecs, tvecs, cameraMatrix,
                                             distCoeffs, reprojErrs, s.useFisheye);
 

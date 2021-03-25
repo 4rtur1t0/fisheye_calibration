@@ -58,3 +58,5 @@ Makefile
 camera_calibration
 
 cmake_install.cmake
+
+fisheye_calibration
