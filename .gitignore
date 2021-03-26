@@ -62,3 +62,19 @@ cmake_install.cmake
 fisheye_calibration
 
 custom_calib/
+
+CMakeFiles/fisheye_calibration.dir/build.make
+
+*.cmake
+
+*.includecache
+
+*.internal
+
+CMakeFiles/fisheye_calibration.dir/depend.make
+
+*.o
+
+*.make
+
+CMakeFiles/fisheye_calibration.dir/link.txt

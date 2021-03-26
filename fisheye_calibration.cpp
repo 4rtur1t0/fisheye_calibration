@@ -7,6 +7,7 @@
     Examples are provided (that work!) with fisheye real images.
 
     author: Arturo Gil Aparicio
+    institution: Universidad Miguel Hernández de Elche
     email: arturo.gil@umh.es
     date: march 2021
 */
@@ -236,6 +237,8 @@ public:
 
     int cameraID;
     vector<string> imageList;
+    vector<string> imageList_detected;
+
     size_t atImageList;
     VideoCapture inputCapture;
     InputType inputType;
@@ -355,7 +358,7 @@ int main(int argc, char* argv[])
         }
         //! [find_pattern]
         //! [pattern_found]
-        if ( found)                // If done with success,
+        if(found)                // If done with success,
         {
               // improve the found corners' coordinate accuracy for chessboard
                 if( s.calibrationPattern == Settings::CHESSBOARD)
@@ -376,6 +379,8 @@ int main(int argc, char* argv[])
 
                 // Draw the corners.
                 drawChessboardCorners( view, s.boardSize, Mat(pointBuf), found );
+                //append detected image at the detected list
+                s.imageList_detected.push_back(s.imageList[s.atImageList]);
         }
         //! [pattern_found]
         //----------------------------- Output Text ------------------------------------------------
@@ -434,12 +439,19 @@ int main(int argc, char* argv[])
     //! [show_results]
     if( s.inputType == Settings::IMAGE_LIST && s.showUndistorsed && !cameraMatrix.empty())
     {
-        Mat view, rview, map1, map2;
+        Mat view, rview, map1, map2;   
+        /*Mat scaled_K;
+        scaled_K = cameraMatrix;
+        scaled_K.at<double>(0,0)=0.5*cameraMatrix.at<double>(0,0);
+        scaled_K.at<double>(1,1)=0.5*cameraMatrix.at<double>(1,1);*/
+
+
         destroyAllWindows();
         namedWindow("Undistorted Image View", CV_WINDOW_NORMAL);
         resizeWindow("Undistorted Image View", 1400, 1400);
         if (s.useFisheye)
         {
+            cout << "Estimating rectify map for images...." << endl;
             Mat newCamMat;
             fisheye::estimateNewCameraMatrixForUndistortRectify(cameraMatrix, distCoeffs, imageSize,
                                                                 Matx33d::eye(), newCamMat, 1);
@@ -460,8 +472,9 @@ int main(int argc, char* argv[])
             view = imread(s.imageList[i], IMREAD_COLOR);
             if(view.empty())
                 continue;
-            remap(view, rview, map1, map2, INTER_LINEAR);
+            remap(view, rview, map1, map2, INTER_LINEAR, BORDER_CONSTANT);
             //cv::fisheye::undistortImage(view, rview, cameraMatrix, distCoeffs, newK);
+            cout << "Showing undistorted image with: " << rview.size() << endl;
             imshow("Undistorted Image View", rview);
             char c = (char)waitKey();
             if( c  == ESC_KEY || c == 'q' || c == 'Q' )
@@ -531,12 +544,14 @@ static double reprojectOnImages(Settings& s, const vector<vector<Point3f> >& obj
     
     namedWindow("Image View with projected points green: ground-truth, red: model", CV_WINDOW_NORMAL);
     resizeWindow("Image View with projected points green: ground-truth, red: model", 1400, 1400);
+    cout << "Only showing images with a correctly detected checkerboard." << endl;
     cout << "Showing images with reprojected points. Press any key to continue." << endl;
+
     cout << "Press ESC to exit" << endl ;
     for(size_t i = 0; i < objectPoints.size(); ++i )
     {
-	 Mat view;
-	 cout << "Showing image: " << s.imageList[i];
+	Mat view;
+	cout << "Showing image: " << s.imageList_detected[i];
         if (fisheye)
         {
             fisheye::projectPoints(objectPoints[i], imagePoints2, rvecs[i], tvecs[i], cameraMatrix,
@@ -563,9 +578,8 @@ static double reprojectOnImages(Settings& s, const vector<vector<Point3f> >& obj
         
         // show points  projected according to model with red crosses 
         for (cv::Point p:imagePoints2) {
-        	//cv::circle(view, p, 10, cv::Scalar(0, 0, 255), 2, cv::LINE_8, 0);
         	cv::drawMarker(view, p, cv::Scalar(0, 0, 255), MARKER_CROSS, 20, 2, cv::LINE_8 );
-          }
+        }
                 
         imshow("Image View with projected points green: ground-truth, red: model", view);
         
@@ -625,7 +639,7 @@ static bool runCalibration( Settings& s, Size& imageSize, Mat& cameraMatrix, Mat
     vector<vector<Point3f> > objectPoints(1);
     calcBoardCornerPositions(s.boardSize, s.squareSize, objectPoints[0], s.calibrationPattern);
 
-    objectPoints.resize(imagePoints.size(),objectPoints[0]);
+    objectPoints.resize(imagePoints.size(), objectPoints[0]);
 
     //Find intrinsic and extrinsic camera parameters
     double rms;
