@@ -309,7 +309,7 @@ int main(int argc, char* argv[])
         bool blinkOutput = false;
 	string current_image;
         view = s.nextImage(current_image);
-        cout << "Current image is: "<< current_image <<endl;
+        cout << "Current image is: " << s.atImageList << "/" << s.imageList.size() << current_image <<endl;
 
         //-----  If no more image, or got enough, then stop calibration and show result -------------
         if( mode == CAPTURING && imagePoints.size() >= (size_t)s.nrFrames )
@@ -542,7 +542,7 @@ static double reprojectOnImages(Settings& s, const vector<vector<Point3f> >& obj
     cout << "Only showing images with a correctly detected checkerboard." << endl;
     cout << "Showing images with reprojected points. Press any key to continue." << endl;
 
-    cout << "Press ESC to exit" << endl ;
+    cout << "Press ESC to exit" << endl;
     for(size_t i = 0; i < objectPoints.size(); ++i )
     {
 	Mat view;
@@ -587,6 +587,27 @@ static double reprojectOnImages(Settings& s, const vector<vector<Point3f> >& obj
         if( c  == ESC_KEY || c == 'q' || c == 'Q' )
              break;
         
+    }
+    
+    cout << "Reprojecting image list with detected checkerboard and with reprojection error RMS < 10!!!" << endl;
+    
+    for(size_t i = 0; i < objectPoints.size(); ++i )
+    {
+        if (fisheye)
+        {
+            fisheye::projectPoints(objectPoints[i], imagePoints2, rvecs[i], tvecs[i], cameraMatrix,
+                                   distCoeffs);
+        }
+        else
+        {
+            projectPoints(objectPoints[i], rvecs[i], tvecs[i], cameraMatrix, distCoeffs, imagePoints2);
+        }
+        err = norm(imagePoints[i], imagePoints2, NORM_L2);
+        size_t n = imagePoints[i].size();
+        err = (float) std::sqrt(err*err/n); 
+	// printing a list with RMS < 10, feel free to lower this value!
+	if (err < 10.0)
+		cout << s.imageList_detected[i] << endl;       
     }
 
     return true;
