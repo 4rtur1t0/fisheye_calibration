@@ -85,3 +85,21 @@ compile_commands.json
 .cproject
 
 .project
+
+custom_calib1/calib_config_back.xml
+
+custom_calib1/calib_config_front.xml
+
+custom_calib1/calib_images_back.xml
+
+custom_calib1/calib_images_front.xml
+
+custom_calib2/calib_config_back.xml
+
+custom_calib2/calib_config_front.xml
+
+custom_calib2/calib_images_back.xml
+
+custom_calib2/calib_images_front.xml
+
+calib_data_front.yml

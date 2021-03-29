@@ -1,3 +1,15 @@
+/*
+fisheye_calibration
+
+Based on the camera_calibration.cpp sample by OpenCV.
+
+Added some custom features. Reprojecting on images.
+
+Author: Arturo Gil Aparicio
+date: march 2021
+
+*/
+
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -491,6 +503,7 @@ static double computeReprojectionErrors( const vector<vector<Point3f> >& objectP
         {
             projectPoints(objectPoints[i], rvecs[i], tvecs[i], cameraMatrix, distCoeffs, imagePoints2);
         }
+        cout << "imagePoints2 size is: " << imagePoints2.size() << endl;
         err = norm(imagePoints[i], imagePoints2, NORM_L2);
 
         size_t n = objectPoints[i].size();
@@ -534,7 +547,9 @@ static double reprojectOnImages(Settings& s, const vector<vector<Point3f> >& obj
     {
 	Mat view;
 	cout << "Showing image: " << s.imageList_detected[i] << endl;
-        cout << "Reading image: " << s.imageList_detected[i]<< endl;
+        //cout << "Reading image: " << s.imageList_detected[i]<< endl;
+        cout << "Projecting with rvec: " << rvecs[i] << endl;
+        cout << "Projecting with tvec: " << tvecs[i] << endl;
         //view = imread(s.imageList_detected[i], IMREAD_COLOR);
         if (fisheye)
         {
@@ -545,6 +560,7 @@ static double reprojectOnImages(Settings& s, const vector<vector<Point3f> >& obj
         {
             projectPoints(objectPoints[i], rvecs[i], tvecs[i], cameraMatrix, distCoeffs, imagePoints2);
         }
+        cout << "imagePoints2 size is: " << imagePoints2.size() << endl;
         err = norm(imagePoints[i], imagePoints2, NORM_L2);
         size_t n = imagePoints[i].size();
 
