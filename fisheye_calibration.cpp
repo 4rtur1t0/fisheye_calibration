@@ -1,16 +1,3 @@
-/*
-    A version of the camera_calibration.cpp file provided by OpenCV.
-
-    Added some features such as reprojection of the points on the calibration 
-    images and showing some extra info.
-
-    Examples are provided (that work!) with fisheye real images.
-
-    author: Arturo Gil Aparicio
-    institution: Universidad Miguel Hernández de Elche
-    email: arturo.gil@umh.es
-    date: march 2021
-*/
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -30,9 +17,10 @@ using namespace std;
 
 static void help()
 {
-    cout <<  "This is fisheye_calibration." << endl
-         <<  "Usage: fisheye_calibration [configuration_file -- default ./default.xml]"  << endl
-         <<  "Example: ./fisheye_calibration calib_config/calib_config_example.xml" << endl;
+    cout <<  "This is a camera calibration sample." << endl
+         <<  "Usage: camera_calibration [configuration_file -- default ./default.xml]"  << endl
+         <<  "Near the sample file you'll find the configuration file, which has detailed help of "
+             "how to edit it.  It may be any OpenCV supported file format XML/YAML." << endl;
 }
 class Settings
 {
@@ -174,7 +162,7 @@ public:
         atImageList = 0;
 
     }
-    Mat nextImage()
+    Mat nextImage(string &filename)
     {
         Mat result;
         if( inputCapture.isOpened() )
@@ -183,9 +171,14 @@ public:
             inputCapture >> view0;
             view0.copyTo(result);
         }
-        else if( atImageList < imageList.size() )
+        else if( atImageList < imageList.size() ){
+            filename = imageList[atImageList];
             result = imread(imageList[atImageList++], IMREAD_COLOR);
-
+	    //
+	}
+	else{
+	filename = "None";}
+		
         return result;
     }
 
@@ -238,7 +231,6 @@ public:
     int cameraID;
     vector<string> imageList;
     vector<string> imageList_detected;
-
     size_t atImageList;
     VideoCapture inputCapture;
     InputType inputType;
@@ -291,23 +283,21 @@ int main(int argc, char* argv[])
     }
 
     vector<vector<Point2f> > imagePoints;
-    Mat cameraMatrix, distCoeffs, newK;
+    Mat cameraMatrix, distCoeffs;
     Size imageSize;
     int mode = s.inputType == Settings::IMAGE_LIST ? CAPTURING : DETECTION;
     clock_t prevTimestamp = 0;
     const Scalar RED(0,0,255), GREEN(0,255,0);
     const char ESC_KEY = 27;
 
-    namedWindow("Image View", CV_WINDOW_NORMAL);
-    resizeWindow("Image View", 1400, 1400);
-
     //! [get_input]
     for(;;)
     {
         Mat view;
         bool blinkOutput = false;
-
-        view = s.nextImage();
+	string current_image;
+        view = s.nextImage(current_image);
+        cout << "Current image is: "<< current_image <<endl;
 
         //-----  If no more image, or got enough, then stop calibration and show result -------------
         if( mode == CAPTURING && imagePoints.size() >= (size_t)s.nrFrames )
@@ -358,14 +348,15 @@ int main(int argc, char* argv[])
         }
         //! [find_pattern]
         //! [pattern_found]
-        if(found)                // If done with success,
+        if (found)                // If done with success,
         {
+        	//cout << "Pattern found in " << endl << s.imageList[s.atImageList]<< endl;
               // improve the found corners' coordinate accuracy for chessboard
                 if( s.calibrationPattern == Settings::CHESSBOARD)
                 {
                     Mat viewGray;
                     cvtColor(view, viewGray, COLOR_BGR2GRAY);
-                    cornerSubPix( viewGray, pointBuf, Size(20,20),
+                    cornerSubPix( viewGray, pointBuf, Size(10,10),
                         Size(-1,-1), TermCriteria( TermCriteria::EPS+TermCriteria::COUNT, 30, 0.1 ));
                 }
 
@@ -379,8 +370,7 @@ int main(int argc, char* argv[])
 
                 // Draw the corners.
                 drawChessboardCorners( view, s.boardSize, Mat(pointBuf), found );
-                //append detected image at the detected list
-                s.imageList_detected.push_back(s.imageList[s.atImageList]);
+                s.imageList_detected.push_back(current_image);
         }
         //! [pattern_found]
         //----------------------------- Output Text ------------------------------------------------
@@ -416,8 +406,9 @@ int main(int argc, char* argv[])
         }
         //! [output_undistorted]
         //------------------------------ Show image and check for input commands -------------------
-        
         //! [await_input]
+        namedWindow("Image View", CV_WINDOW_NORMAL);
+    	resizeWindow("Image View", 1400, 1400);
         imshow("Image View", view);
         char key = (char)waitKey(s.inputCapture.isOpened() ? 50 : s.delay);
 
@@ -439,19 +430,13 @@ int main(int argc, char* argv[])
     //! [show_results]
     if( s.inputType == Settings::IMAGE_LIST && s.showUndistorsed && !cameraMatrix.empty())
     {
-        Mat view, rview, map1, map2;   
-        /*Mat scaled_K;
-        scaled_K = cameraMatrix;
-        scaled_K.at<double>(0,0)=0.5*cameraMatrix.at<double>(0,0);
-        scaled_K.at<double>(1,1)=0.5*cameraMatrix.at<double>(1,1);*/
+        Mat view, rview, map1, map2;
 
-
-        destroyAllWindows();
-        namedWindow("Undistorted Image View", CV_WINDOW_NORMAL);
-        resizeWindow("Undistorted Image View", 1400, 1400);
+    	cv::destroyAllWindows();
+    	namedWindow("Image View Undistorted", CV_WINDOW_NORMAL);
+    	resizeWindow("Image View Undistorted", 1400, 1400);
         if (s.useFisheye)
         {
-            cout << "Estimating rectify map for images...." << endl;
             Mat newCamMat;
             fisheye::estimateNewCameraMatrixForUndistortRectify(cameraMatrix, distCoeffs, imageSize,
                                                                 Matx33d::eye(), newCamMat, 1);
@@ -468,23 +453,17 @@ int main(int argc, char* argv[])
 
         for(size_t i = 0; i < s.imageList.size(); i++ )
         {
-            
             view = imread(s.imageList[i], IMREAD_COLOR);
             if(view.empty())
                 continue;
-            remap(view, rview, map1, map2, INTER_LINEAR, BORDER_CONSTANT);
-            //cv::fisheye::undistortImage(view, rview, cameraMatrix, distCoeffs, newK);
-            cout << "Showing undistorted image with: " << rview.size() << endl;
-            imshow("Undistorted Image View", rview);
+            remap(view, rview, map1, map2, INTER_LINEAR);
+            imshow("Image View Undistorted", rview);
             char c = (char)waitKey();
             if( c  == ESC_KEY || c == 'q' || c == 'Q' )
                 break;
         }
     }
     //! [show_results]
-    
-   
-    
 
     return 0;
 }
@@ -523,6 +502,9 @@ static double computeReprojectionErrors( const vector<vector<Point3f> >& objectP
     return std::sqrt(totalErr/totalPoints);
 }
 
+
+
+
 //! [compute_errors]
 static double reprojectOnImages(Settings& s, const vector<vector<Point3f> >& objectPoints,
                                          const vector<vector<Point2f> >& imagePoints,
@@ -551,7 +533,9 @@ static double reprojectOnImages(Settings& s, const vector<vector<Point3f> >& obj
     for(size_t i = 0; i < objectPoints.size(); ++i )
     {
 	Mat view;
-	cout << "Showing image: " << s.imageList_detected[i];
+	cout << "Showing image: " << s.imageList_detected[i] << endl;
+        cout << "Reading image: " << s.imageList_detected[i]<< endl;
+        //view = imread(s.imageList_detected[i], IMREAD_COLOR);
         if (fisheye)
         {
             fisheye::projectPoints(objectPoints[i], imagePoints2, rvecs[i], tvecs[i], cameraMatrix,
@@ -567,7 +551,7 @@ static double reprojectOnImages(Settings& s, const vector<vector<Point3f> >& obj
         cout << ". RMS error for this view is: " << (float) std::sqrt(err*err/n) << endl;
 
         //Load calib image
-        view = imread(s.imageList[i], IMREAD_COLOR);
+        view = imread(s.imageList_detected[i], IMREAD_COLOR);
         if(view.empty())
             continue;
             
@@ -591,6 +575,9 @@ static double reprojectOnImages(Settings& s, const vector<vector<Point3f> >& obj
 
     return true;
 }
+
+
+
 
 
 //! [compute_errors]
@@ -618,8 +605,6 @@ static void calcBoardCornerPositions(Size boardSize, float squareSize, vector<Po
         break;
     }
 }
-
-
 //! [board_corners]
 static bool runCalibration( Settings& s, Size& imageSize, Mat& cameraMatrix, Mat& distCoeffs,
                             vector<vector<Point2f> > imagePoints, vector<Mat>& rvecs, vector<Mat>& tvecs,
@@ -639,7 +624,7 @@ static bool runCalibration( Settings& s, Size& imageSize, Mat& cameraMatrix, Mat
     vector<vector<Point3f> > objectPoints(1);
     calcBoardCornerPositions(s.boardSize, s.squareSize, objectPoints[0], s.calibrationPattern);
 
-    objectPoints.resize(imagePoints.size(), objectPoints[0]);
+    objectPoints.resize(imagePoints.size(),objectPoints[0]);
 
     //Find intrinsic and extrinsic camera parameters
     double rms;
@@ -663,13 +648,10 @@ static bool runCalibration( Settings& s, Size& imageSize, Mat& cameraMatrix, Mat
     cout << "Re-projection error reported by calibrateCamera: "<< rms << endl;
 
     bool ok = checkRange(cameraMatrix) && checkRange(distCoeffs);
-    cout << "***********************"<< endl;
-    cout << endl << "CALIBRATION FINISHED!. check output XML/YAML file" << endl;
-    cout << "***********************"<< endl;
 
-    cout << "Computing reprojection error" << endl;
     totalAvgErr = computeReprojectionErrors(objectPoints, imagePoints, rvecs, tvecs, cameraMatrix,
                                             distCoeffs, reprojErrs, s.useFisheye);
+                                  
     cout << "Reprojecting on images!" << endl;
     cout << "Press space to continue. Press ESC to exit." << endl;
     reprojectOnImages(s, objectPoints, imagePoints, rvecs, tvecs, cameraMatrix,

@@ -78,3 +78,10 @@ CMakeFiles/fisheye_calibration.dir/depend.make
 *.make
 
 CMakeFiles/fisheye_calibration.dir/link.txt
+/build/
+
+compile_commands.json
+
+.cproject
+
+.project
